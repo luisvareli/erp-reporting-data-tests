@@ -1,0 +1,51 @@
+name: tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: erp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d erp"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/erp
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build the database
+        run: npm run db:reset
+
+      - name: Run the tests
+        run: npm test
+
+      - name: Check that seeded defects are caught
+        run: npm run test:defects
